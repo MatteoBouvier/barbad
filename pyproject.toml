@@ -1,0 +1,33 @@
+[project]
+name = "barbad"
+version = "0.1.0"
+description = "A CPython bytecode optimizer"
+authors = [
+    {name = "Matteo Bouvier",email = "matteo.bouvier@hotmail.fr"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+]
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.11.10"
+
+[project.scripts]
+barbad = "barbad.cli:cli"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true
+
+[tool.basedpyright]
+reportAny = false
+reportUnusedCallResult = false
