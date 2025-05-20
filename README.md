@@ -2,10 +2,12 @@
 A CPython bytecode optimizer
 
 # Work in progress
-- [ ] inlining
-    - class methods ? (static or not)
-    - functions with args, kwargs, expressions as args, pos only, kwonly, default values, varargs
-    - functions with long body
+- [-] inlining
+    - [x] function with args only
+    - [ ] functions with args, kwargs, expressions as args, pos only, kwonly, default values, varargs
+    - [ ] functions with long body
+    - [ ] auto inline short functions
+    - [ ] class methods ? (static or not)
 
 # Optimizations to investigate
 - [ ] common subexpression elimination

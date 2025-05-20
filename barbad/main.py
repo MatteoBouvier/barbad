@@ -18,6 +18,7 @@ def main(source: str | Path, optimizations: OptimizationFlag, run: bool = False)
         inline(tree).or_exit()
 
     if run:
+        print(ast.dump(tree, indent=2))
         exec(compile(tree, source.name, "exec"), globals())
 
     return 0
