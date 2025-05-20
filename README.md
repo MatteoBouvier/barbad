@@ -1,4 +1,4 @@
-# barba
+# Barbad
 A CPython bytecode optimizer
 
 # Work in progress
