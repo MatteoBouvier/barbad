@@ -1,3 +1,4 @@
+import abc
 import ast
 from typing import Annotated, override
 
@@ -6,11 +7,32 @@ from barbad.result import Result
 type Inline__[T] = Annotated[T, "__barbad_inline__"]
 
 
-class FindInlined(ast.NodeVisitor):
+class AttemptMixin(abc.ABC):
+    @abc.abstractmethod
+    def visit(self, node: ast.AST) -> None:
+        pass
+
+    def attempt_visit(self, node: ast.AST, error: Result | int) -> Result:
+        if isinstance(error, Result):
+            return error
+
+        try:
+            self.visit(node)
+
+        except Result as r:
+            return r
+
+        except Exception as e:
+            return Result(error, e)
+
+        return Result(0)
+
+
+class FindInlined(ast.NodeVisitor, AttemptMixin):
     def __init__(self) -> None:
         super().__init__()
 
-        self.inline_functions: dict[str, ast.AST] = {}
+        self.inline_functions: dict[str, ast.FunctionDef] = {}
 
     @override
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
@@ -22,9 +44,9 @@ class FindInlined(ast.NodeVisitor):
                 return
 
 
-class RewriteInline(ast.NodeTransformer):
-    def __init__(self, inline_functions: dict[str, ast.AST]) -> None:
-        self.inline_functions: dict[str, ast.AST] = inline_functions
+class RewriteInline(ast.NodeTransformer, AttemptMixin):
+    def __init__(self, inline_functions: dict[str, ast.FunctionDef]) -> None:
+        self.inline_functions: dict[str, ast.FunctionDef] = inline_functions
 
     @override
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None | ast.ImportFrom:
@@ -36,11 +58,27 @@ class RewriteInline(ast.NodeTransformer):
                 return node
 
     @override
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None | ast.FunctionDef:
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None | ast.AST:
         if node.name in self.inline_functions:
             return None
 
         return self.generic_visit(node)
+
+    @staticmethod
+    def _get_args(if_node: ast.FunctionDef, node: ast.Call) -> dict[str, str]:
+        pos_args = {k.arg: v.id for k, v in zip(if_node.args.args, node.args)}
+        kwd_args = {keyword.arg: keyword.value.id for keyword in node.keywords}
+
+        if dbl_args := set(pos_args).intersection(kwd_args):
+            raise Result(12, f"{if_node.name}() got multiple values for argument(s) {', '.join(map(repr, dbl_args))}")
+
+        if mis_args := (len(if_node.args.args) - len(pos_args) - len(kwd_args)):
+            raise Result(
+                13,
+                f"{if_node.name}() missing {mis_args} required positional argument(s) {', '.join(map(lambda a: a.arg, if_node.args.args[:-mis_args]))}",
+            )
+
+        return pos_args | kwd_args
 
     @override
     def visit_Call(self, node: ast.Call):
@@ -48,8 +86,7 @@ class RewriteInline(ast.NodeTransformer):
             case ast.Call(ast.Name(name, _), _, _) if name in self.inline_functions:
                 if_node = self.inline_functions[name]
 
-                args_translation = {k.arg: v.id for k, v in zip(if_node.args.args, node.args)}
-
+                args_translation = self._get_args(if_node, node)
                 return_node = if_node.body[0].value
                 return type(return_node)(
                     *(
@@ -69,16 +106,8 @@ class RewriteInline(ast.NodeTransformer):
 
 
 def inline(tree: ast.AST) -> Result:
-    """Modify an AST tree to inline functions marked with the barbad._inline_ return type."""
+    """Modify an AST tree to inline functions marked with the barbad.Inline__ return type."""
     finder = FindInlined()
-    try:
-        finder.visit(tree)
-    except Exception as e:
-        return Result(10, str(e))
 
-    try:
-        RewriteInline(finder.inline_functions).visit(tree)
-    except Exception as e:
-        return Result(11, str(e))
-
-    return Result(0)
+    res = finder.attempt_visit(tree, 10)
+    return RewriteInline(finder.inline_functions).attempt_visit(tree, res or 11)

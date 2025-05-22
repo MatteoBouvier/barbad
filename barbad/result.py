@@ -1,12 +1,17 @@
 import sys
+import traceback
 from typing import final
 
 
 @final
-class Result:
-    def __init__(self, value: int, message: str = "") -> None:
+class Result(BaseException):
+    def __init__(self, value: int, error: str | Exception = "") -> None:
         self.value = value
-        self.message = message
+        self.message = error if isinstance(error, str) else "".join(traceback.format_exception(error))
+        super().__init__()
+
+    def __bool__(self) -> bool:
+        return bool(self.value)
 
     def or_exit(self) -> None:
         if self.value:
