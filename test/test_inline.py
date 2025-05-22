@@ -20,7 +20,7 @@ def main() -> None:
     y = 4
     c = add(x, y)
     print(c)
-""",
+        """,
         """from barbad import Inline__
 
 def add(a: int, b: int) -> Inline__[int]:
@@ -31,7 +31,7 @@ def main() -> None:
     y = 4
     c = add(b=y, a=x)
     print(c)
-""",
+        """,
         """from barbad import Inline__
 
 def add(a: int, b: int) -> Inline__[int]:
@@ -42,13 +42,13 @@ def main() -> None:
     y = 4
     c = add(x, b=y)
     print(c)
-""",
+        """,
     ],
 )
 def test_inline(stmts: str):
     tree = ast.parse(stmts, "<string>", "exec")
     res = inline(tree)
-    assert res.value == 0, res.message
+    assert res.error is None, res.error.msg
 
     # TODO: optim! unnecessary STORE_FAST
     comp: CodeType = compile(tree, "<string>", "exec")
@@ -56,6 +56,56 @@ def test_inline(stmts: str):
         comp,
         b"\x95\x00S\x03S\x02\x1a\x00j\x04r\x00g\x01",
         b"\x95\x00S\x01n\x00S\x02n\x01X\x01-\x00\x00\x00n\x02[\x01\x00\x00\x00\x00\x00\x00\x00\x00U\x025\x01\x00\x00\x00\x00\x00\x00 \x00g\x00",
+    )
+
+
+def test_inline_with_defaults():
+    stmts = """from barbad import Inline__
+
+def add(a: int, b: int = 4) -> Inline__[int]:
+    return a + b
+
+def main() -> None:
+    x = 3
+    c = add(x)
+    print(c)
+        """
+
+    tree = ast.parse(stmts, "<string>", "exec")
+    res = inline(tree)
+    assert res.error is None, res.error.msg
+
+    # TODO: optim! unnecessary STORE_FAST
+    comp: CodeType = compile(tree, "<string>", "exec")
+    assert_code_equals(
+        comp,
+        b"\x95\x00S\x03S\x02\x1a\x00j\x04r\x00g\x01",
+        b"\x95\x00S\x01n\x00U\x00S\x02-\x00\x00\x00n\x01[\x01\x00\x00\x00\x00\x00\x00\x00\x00U\x015\x01\x00\x00\x00\x00\x00\x00 \x00g\x00",
+    )
+
+
+def test_inline_with_kwargs():
+    stmts = """from barbad import Inline__
+
+def add(a: int, b: int = 2, c: int = 3) -> Inline__[int]:
+    return a + b + c
+
+def main() -> None:
+    x = 3
+    c = add(x, c=4)
+    print(c)
+"""
+
+    tree = ast.parse(stmts, "<string>", "exec")
+    res = inline(tree)
+    assert res.error is None, res.error.msg
+
+    # TODO: optim! constant propagation
+    comp: CodeType = compile(tree, "<string>", "exec")
+    assert_code_equals(
+        comp,
+        b"\x95\x00S\x03S\x02\x1a\x00j\x04r\x00g\x01",
+        b"\x95\x00S\x01n\x00U\x00S\x02-\x00\x00\x00S\x03-\x00\x00\x00n\x01[\x01\x00\x00\x00\x00\x00\x00\x00\x00U\x015\x01\x00\x00\x00\x00\x00\x00 \x00g\x00",
     )
 
 
@@ -96,4 +146,5 @@ def test_inline_should_fail(stmts: str, err_code: int):
     tree = ast.parse(stmts, "<string>", "exec")
     res = inline(tree)
 
-    assert res.value == err_code
+    assert res.error is not None
+    assert res.error.value == err_code
