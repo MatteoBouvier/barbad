@@ -4,7 +4,6 @@ import sys
 from contextlib import closing
 from enum import IntFlag, auto
 from pathlib import Path
-from types import CodeType
 from typing import Literal
 
 from barbad.inline import inline
@@ -15,24 +14,7 @@ class OptimizationFlag(IntFlag):
     inline = auto()
 
 
-def show_code(mode: Literal["raw", "ast", "bytecode"], tree: ast.AST, compiled: CodeType | None):
-    if mode == "raw":
-        print(ast.unparse(tree))
-
-    elif mode == "ast":
-        print(ast.dump(tree, indent=2))
-
-    elif mode == "bytecode":
-        assert compiled is not None
-        dis.dis(compiled)
-
-
-def main(
-    source: str | Path,
-    optimizations: OptimizationFlag,
-    show: Literal["raw", "ast", "bytecode"] | None,
-    run: bool = False,
-) -> int:
+def optimize(source: str | Path, optimizations: OptimizationFlag) -> tuple[str, ast.Module]:
     input_code = sys.stdin if source == "-" else open(source)
     input_name = "<string>" if source == "-" else Path(source).name
 
@@ -42,17 +24,28 @@ def main(
     if optimizations & OptimizationFlag.inline:
         inline(tree).or_exit()
 
-    if run or show == "bytecode":
-        comp = compile(tree, input_name, "exec")
+    return input_name, tree
 
-    else:
-        comp = None
 
-    if show is not None:
-        show_code(show, tree, comp)
+def compile_code(source: str | Path, optimizations: OptimizationFlag, run: bool = False) -> int:
+    input_name, tree = optimize(source, optimizations)
 
     if run:
-        assert comp is not None
-        exec(comp, globals())
+        exec(compile(tree, input_name, "exec"), globals())
+
+    return 0
+
+
+def show_code(source: str | Path, optimizations: OptimizationFlag, mode: Literal["raw", "ast", "bytecode"]) -> int:
+    input_name, tree = optimize(source, optimizations)
+
+    if mode == "raw":
+        print(ast.unparse(tree))
+
+    elif mode == "ast":
+        print(ast.dump(tree, indent=2))
+
+    elif mode == "bytecode":
+        dis.dis(compile(tree, input_name, "exec"))
 
     return 0
