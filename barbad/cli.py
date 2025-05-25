@@ -51,7 +51,10 @@ class CLIParser(argparse.ArgumentParser):
         sub_command_parser = self._sub_commands.add_parser(name, description=None, help=help)
 
         for arg in arguments:
-            sub_command_parser.add_argument(*arg.pop("name_or_flags"), **arg)
+            sub_command_parser.add_argument(
+                *arg.pop("name_or_flags"),  # pyright: ignore[reportCallIssue, reportArgumentType, reportUnknownArgumentType]
+                **arg,
+            )
 
         if is_default:
             self._set_default_action(name)
@@ -65,18 +68,23 @@ class CLIParser(argparse.ArgumentParser):
         return inner
 
     @override
-    def parse_args(
+    def parse_args(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, args: Sequence[str] | None = None, namespace: argparse.Namespace | None = None
     ) -> argparse.Namespace:
+        assert isinstance(self._actions[1].choices, dict)
         if len(sys.argv) == 1 or sys.argv[1] in ("-h", "--help"):
             parser.print_help(sys.stdout)
             sys.exit(0)
 
-        elif sys.argv[1] in ("compile", "show"):
+        elif sys.argv[1] in self._actions[1].choices:  # pyright: ignore[reportUnknownMemberType]
             return super().parse_args(sys.argv[1:])
 
+        elif self.default_action is not None:
+            return super().parse_args([self.default_action] + sys.argv[1:])
+
         else:
-            return super().parse_args(["compile"] + sys.argv[1:])
+            parser.print_help(sys.stderr)
+            sys.exit(1)
 
     def run_sub_command(self, args: argparse.Namespace) -> NoReturn:
         sys.exit(self._sub_command_callbacks[args.__cmd__](args))

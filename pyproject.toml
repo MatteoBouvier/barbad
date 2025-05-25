@@ -31,4 +31,5 @@ skip-magic-trailing-comma = true
 
 [tool.basedpyright]
 reportAny = false
+reportExplicitAny = false
 reportUnusedCallResult = false
